@@ -31,17 +31,18 @@ def upload_document(
     title: str = Form(...),
     department: str = Form("General"),
     roles: str = Form("employee"),
+    classification: str = Form("internal"),
 ) -> dict:
     role_list = [role.strip() for role in roles.split(",") if role.strip()]
     try:
-        return create_document_from_upload(file, title, department, role_list)
+        return create_document_from_upload(file, title, department, role_list, classification)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.patch("/documents/{document_id}")
 def patch_document(document_id: str, payload: DocumentUpdate) -> dict:
-    updated = update_document(document_id, payload.title, payload.department, payload.roles)
+    updated = update_document(document_id, payload.title, payload.department, payload.roles, payload.classification)
     if not updated:
         raise HTTPException(status_code=404, detail="Document not found.")
     return updated

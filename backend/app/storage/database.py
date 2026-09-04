@@ -62,6 +62,7 @@ def init_db() -> None:
                 title TEXT NOT NULL,
                 department TEXT NOT NULL,
                 roles TEXT NOT NULL,
+                classification TEXT NOT NULL DEFAULT 'internal',
                 source_filename TEXT NOT NULL,
                 storage_path TEXT NOT NULL,
                 version INTEGER NOT NULL DEFAULT 1,
@@ -107,6 +108,13 @@ def init_db() -> None:
             );
             """
         )
+        _ensure_column(connection, "documents", "classification", "TEXT NOT NULL DEFAULT 'internal'")
+
+
+def _ensure_column(connection: sqlite3.Connection, table: str, column: str, definition: str) -> None:
+    columns = {row["name"] for row in connection.execute(f"PRAGMA table_info({table})").fetchall()}
+    if column not in columns:
+        connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
 
 
 def ensure_data_dirs() -> None:

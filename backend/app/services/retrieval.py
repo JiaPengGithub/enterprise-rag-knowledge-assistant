@@ -7,15 +7,32 @@ from app.storage.database import get_connection, loads, rows_to_dicts
 
 
 def allowed_document_ids(user: dict) -> list[str]:
-    roles = set(user["roles"])
     with get_connection() as connection:
-        rows = rows_to_dicts(connection.execute("SELECT id, roles FROM documents WHERE active = 1").fetchall())
+        rows = rows_to_dicts(
+            connection.execute("SELECT id, department, roles, classification FROM documents WHERE active = 1").fetchall()
+        )
     allowed = []
     for row in rows:
-        document_roles = set(loads(row["roles"], []))
-        if "admin" in roles or roles & document_roles:
+        row["roles"] = loads(row["roles"], [])
+        if can_access_document(user, row):
             allowed.append(row["id"])
     return allowed
+
+
+def can_access_document(user: dict, document: dict) -> bool:
+    user_roles = set(user["roles"])
+    document_roles = set(document["roles"])
+    classification = document.get("classification", "internal")
+
+    if "admin" in user_roles:
+        return True
+    if classification == "public":
+        return True
+    if classification == "internal":
+        return "employee" in user_roles
+    if classification == "confidential":
+        return user["department"] == document["department"] or bool(user_roles & document_roles)
+    return False
 
 
 def hybrid_search(question: str, user: dict, limit: int | None = None) -> list[dict]:

@@ -236,6 +236,13 @@ textarea {
   margin: 0;
 }
 
+.classification {
+  color: #315c85;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
 .metric-row {
   display: grid;
   gap: 14px;

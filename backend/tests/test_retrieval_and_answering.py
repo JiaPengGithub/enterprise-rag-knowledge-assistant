@@ -2,8 +2,9 @@ import sys
 from types import SimpleNamespace
 
 from app.services.answering import INSUFFICIENT_EVIDENCE_MESSAGE, answer_question
+from app.services.documents import ingest_document
 from app.services.vector_store import embed_texts, openai_collection_name
-from app.services.retrieval import allowed_document_ids, hybrid_search
+from app.services.retrieval import allowed_document_ids, can_access_document, hybrid_search
 from app.services.users import get_user
 
 
@@ -26,6 +27,51 @@ def test_admin_can_access_all_seed_documents(isolated_app):
     ids = allowed_document_ids(user)
 
     assert len(ids) == 3
+
+
+def test_public_document_is_visible_to_all_demo_users(isolated_app, tmp_path):
+    document = _ingest_text_document(tmp_path, "cafeteria", "Cafeteria Menu", "Facilities", [], "public")
+
+    for user_id in ["hr_user", "it_user", "pm_user", "admin"]:
+        assert document["id"] in allowed_document_ids(get_user(user_id))
+
+
+def test_internal_document_is_visible_to_employee_users(isolated_app, tmp_path):
+    document = _ingest_text_document(tmp_path, "office_map", "Office Map", "Facilities", [], "internal")
+
+    assert document["id"] in allowed_document_ids(get_user("hr_user"))
+    assert document["id"] in allowed_document_ids(get_user("admin"))
+
+
+def test_confidential_document_allows_same_department(isolated_app):
+    user = get_user("hr_user")
+    document = {"department": "Human Resources", "roles": [], "classification": "confidential"}
+
+    assert can_access_document(user, document)
+
+
+def test_confidential_document_allows_matching_role(isolated_app):
+    user = get_user("pm_user")
+    document = {"department": "Finance", "roles": ["project"], "classification": "confidential"}
+
+    assert can_access_document(user, document)
+
+
+def test_confidential_document_blocks_cross_department_without_matching_role(isolated_app, tmp_path):
+    _ingest_text_document(
+        tmp_path,
+        "payroll",
+        "Payroll Forecast",
+        "Finance",
+        ["finance"],
+        "confidential",
+        "Payroll forecast includes a confidential retention budget for finance leadership.",
+    )
+
+    response = answer_question("zephyr payroll forecast retention budget", "it_user")
+
+    assert all(chunk["document_title"] != "Payroll Forecast" for chunk in response["retrieved_chunks"])
+    assert all(citation["document_title"] != "Payroll Forecast" for citation in response["citations"])
 
 
 def test_insufficient_evidence_uses_english_fallback(isolated_app):
@@ -73,3 +119,17 @@ def test_embedding_uses_openai_when_api_key_is_configured(isolated_app, monkeypa
         "model": "text-embedding-3-small",
         "input": ["first", "second"],
     }
+
+
+def _ingest_text_document(
+    tmp_path,
+    filename: str,
+    title: str,
+    department: str,
+    roles: list[str],
+    classification: str,
+    content: str = "This shared document is available for permission model testing.",
+) -> dict:
+    path = tmp_path / f"{filename}.txt"
+    path.write_text(content, encoding="utf-8")
+    return ingest_document(path, title, department, roles, classification=classification)

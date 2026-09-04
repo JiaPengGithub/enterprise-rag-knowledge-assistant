@@ -27,6 +27,7 @@ export const api = {
     form.append('title', payload.title)
     form.append('department', payload.department)
     form.append('roles', payload.roles)
+    form.append('classification', payload.classification)
     return request('/api/documents/upload', { method: 'POST', body: form })
   },
   updateDocument: (documentId, payload) =>

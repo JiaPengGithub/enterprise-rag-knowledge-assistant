@@ -1,4 +1,9 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field
+
+
+DocumentClassification = Literal["public", "internal", "confidential"]
 
 
 class ChatRequest(BaseModel):
@@ -10,3 +15,4 @@ class DocumentUpdate(BaseModel):
     title: str | None = None
     department: str | None = None
     roles: list[str] | None = None
+    classification: DocumentClassification | None = None

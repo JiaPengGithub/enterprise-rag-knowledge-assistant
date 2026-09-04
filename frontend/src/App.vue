@@ -70,7 +70,7 @@
         <header class="panel-header">
           <div>
             <h2>Document management</h2>
-            <p>Upload source material and assign access roles for permission-aware retrieval.</p>
+            <p>Upload source material and assign access controls for permission-aware retrieval.</p>
           </div>
         </header>
 
@@ -87,6 +87,14 @@
             <span>Roles</span>
             <input v-model="uploadForm.roles" placeholder="employee,hr" required />
           </label>
+          <label class="field">
+            <span>Classification</span>
+            <select v-model="uploadForm.classification">
+              <option value="public">Public</option>
+              <option value="internal">Internal</option>
+              <option value="confidential">Confidential</option>
+            </select>
+          </label>
           <label class="file-field">
             <UploadIcon :size="18" />
             <span>{{ uploadForm.file?.name || 'Choose PDF, DOCX, TXT, or Markdown' }}</span>
@@ -100,6 +108,7 @@
             <h3>{{ document.title }}</h3>
             <p>{{ document.department }}</p>
             <span>{{ document.roles.join(', ') }}</span>
+            <span class="classification">{{ document.classification }}</span>
             <small>Version {{ document.version }} · {{ document.chunk_count }} chunks</small>
           </article>
         </div>
@@ -154,6 +163,7 @@ const uploadForm = reactive({
   title: '',
   department: 'General',
   roles: 'employee',
+  classification: 'internal',
   file: null,
 })
 
@@ -195,6 +205,7 @@ async function upload() {
     uploadForm.title = ''
     uploadForm.department = 'General'
     uploadForm.roles = 'employee'
+    uploadForm.classification = 'internal'
     uploadForm.file = null
     documents.value = await api.documents()
   } catch (err) {

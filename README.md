@@ -9,7 +9,7 @@ The demo is intentionally local-first. It uses FastAPI, SQLite, Chroma, LangChai
 - Upload, parse, update, and list PDF, DOCX, TXT, and Markdown documents.
 - Preserve document metadata, role access, document version, chunk id, and page number where available.
 - Run hybrid retrieval with keyword scoring and Chroma-backed semantic search.
-- Filter documents by demo user permissions before answer generation.
+- Enforce enterprise-style access control with department, role, and document classification before retrieval.
 - Return English answers with citations that include source document, page, version, chunk id, and excerpt.
 - Return a clear English insufficient-evidence answer when available documents do not support the question.
 - Store query logs with retrieved chunks, citations, status, and latency.
@@ -23,7 +23,7 @@ flowchart LR
     Employee[Employee / Demo User] --> Frontend[Vue Frontend]
     Frontend --> API[FastAPI Backend]
 
-    API --> Auth[Demo User & Role Filter]
+    API --> Auth[Department + Role + Classification Filter]
     API --> Docs[Document Service]
     API --> Retrieval[Hybrid Retrieval]
     API --> Answering[Answer Generation]
@@ -119,6 +119,16 @@ sequenceDiagram
 | `it_user` | IT | `employee`, `it` |
 | `pm_user` | Product | `employee`, `project` |
 | `admin` | Operations | `employee`, `admin` |
+
+## Access Control Model
+
+Documents are filtered before keyword search, vector search, answer generation, and citation rendering. The demo uses three classification levels:
+
+| Classification | Access Rule |
+| --- | --- |
+| `public` | Visible to all demo users |
+| `internal` | Visible to users with `employee` or `admin` roles |
+| `confidential` | Visible to `admin`, users in the same department, or users with a matching document role |
 
 ## Quick Start
 

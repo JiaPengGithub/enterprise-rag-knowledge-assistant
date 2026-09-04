@@ -11,6 +11,10 @@ from app.services.vector_store import ChromaIndex
 from app.storage.database import dumps, get_connection, loads, row_to_dict, rows_to_dicts
 
 
+VALID_CLASSIFICATIONS = {"public", "internal", "confidential"}
+DEFAULT_CLASSIFICATION = "internal"
+
+
 def list_documents() -> list[dict]:
     with get_connection() as connection:
         rows = rows_to_dicts(
@@ -30,14 +34,28 @@ def list_documents() -> list[dict]:
     return rows
 
 
-def create_document_from_upload(file: UploadFile, title: str, department: str, roles: list[str]) -> dict:
+def create_document_from_upload(
+    file: UploadFile,
+    title: str,
+    department: str,
+    roles: list[str],
+    classification: str = DEFAULT_CLASSIFICATION,
+) -> dict:
     settings = get_settings()
     document_id = uuid4().hex
     safe_name = Path(file.filename or "document.txt").name
     storage_path = settings.upload_dir / f"{document_id}_{safe_name}"
     with storage_path.open("wb") as output:
         shutil.copyfileobj(file.file, output)
-    return ingest_document(storage_path, title, department, roles, document_id=document_id, source_filename=safe_name)
+    return ingest_document(
+        storage_path,
+        title,
+        department,
+        roles,
+        classification=classification,
+        document_id=document_id,
+        source_filename=safe_name,
+    )
 
 
 def ingest_document(
@@ -45,30 +63,33 @@ def ingest_document(
     title: str,
     department: str,
     roles: list[str],
+    classification: str = DEFAULT_CLASSIFICATION,
     document_id: str | None = None,
     source_filename: str | None = None,
     version: int = 1,
 ) -> dict:
     document_id = document_id or uuid4().hex
     source_filename = source_filename or storage_path.name
+    classification = normalize_classification(classification)
     pages = parse_document(storage_path)
     chunks = chunk_pages(document_id, version, pages)
     with get_connection() as connection:
         connection.execute(
             """
-            INSERT INTO documents (id, title, department, roles, source_filename, storage_path, version, active)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+            INSERT INTO documents (id, title, department, roles, classification, source_filename, storage_path, version, active)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
             ON CONFLICT(id) DO UPDATE SET
                 title = excluded.title,
                 department = excluded.department,
                 roles = excluded.roles,
+                classification = excluded.classification,
                 source_filename = excluded.source_filename,
                 storage_path = excluded.storage_path,
                 version = excluded.version,
                 active = 1,
                 updated_at = CURRENT_TIMESTAMP
             """,
-            (document_id, title, department, dumps(roles), source_filename, str(storage_path), version),
+            (document_id, title, department, dumps(roles), classification, source_filename, str(storage_path), version),
         )
         connection.execute("DELETE FROM chunks WHERE document_id = ?", (document_id,))
         chunk_rows = []
@@ -96,18 +117,26 @@ def ingest_document(
     return get_document(document_id) or {}
 
 
-def update_document(document_id: str, title: str | None, department: str | None, roles: list[str] | None) -> dict | None:
+def update_document(
+    document_id: str,
+    title: str | None,
+    department: str | None,
+    roles: list[str] | None,
+    classification: str | None = None,
+) -> dict | None:
     existing = get_document(document_id)
     if not existing:
         return None
     next_title = title or existing["title"]
     next_department = department or existing["department"]
     next_roles = roles or existing["roles"]
+    next_classification = classification or existing["classification"]
     return ingest_document(
         Path(existing["storage_path"]),
         next_title,
         next_department,
         next_roles,
+        classification=next_classification,
         document_id=document_id,
         source_filename=existing["source_filename"],
         version=existing["version"] + 1,
@@ -136,11 +165,18 @@ def seed_sample_documents() -> None:
     if existing:
         return
     samples = [
-        ("employee_handbook.md", "Employee Handbook", "Human Resources", ["hr"]),
-        ("it_operations_manual.md", "IT Operations Manual", "IT", ["it"]),
-        ("project_orion_brief.md", "Project Orion Brief", "Product", ["project"]),
+        ("employee_handbook.md", "Employee Handbook", "Human Resources", ["hr"], "confidential"),
+        ("it_operations_manual.md", "IT Operations Manual", "IT", ["it"], "confidential"),
+        ("project_orion_brief.md", "Project Orion Brief", "Product", ["project"], "confidential"),
     ]
-    for filename, title, department, roles in samples:
+    for filename, title, department, roles, classification in samples:
         path = settings.sample_docs_dir / filename
         if path.exists():
-            ingest_document(path, title, department, roles)
+            ingest_document(path, title, department, roles, classification=classification)
+
+
+def normalize_classification(classification: str | None) -> str:
+    normalized = (classification or DEFAULT_CLASSIFICATION).strip().lower()
+    if normalized not in VALID_CLASSIFICATIONS:
+        raise ValueError("classification must be one of: public, internal, confidential")
+    return normalized
