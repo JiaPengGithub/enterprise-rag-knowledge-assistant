@@ -16,6 +16,101 @@ The demo is intentionally local-first. It uses FastAPI, SQLite, Chroma, LangChai
 - Run seeded retrieval evaluation cases with hit rate, MRR, and citation coverage.
 - Start locally with Docker Compose.
 
+## Architecture
+
+```mermaid
+flowchart LR
+    Employee[Employee / Demo User] --> Frontend[Vue Frontend]
+    Frontend --> API[FastAPI Backend]
+
+    API --> Auth[Demo User & Role Filter]
+    API --> Docs[Document Service]
+    API --> Retrieval[Hybrid Retrieval]
+    API --> Answering[Answer Generation]
+    API --> Eval[Evaluation Runner]
+
+    Docs --> Parser[PDF / DOCX / TXT / Markdown Parser]
+    Parser --> Chunker[Chunking Service]
+    Chunker --> SQLite[(SQLite Metadata & Logs)]
+    Chunker --> Embeddings[OpenAI Embeddings or Local Hash Fallback]
+    Embeddings --> Chroma[(Chroma Vector Store)]
+
+    Retrieval --> SQLite
+    Retrieval --> Chroma
+    Retrieval --> Rerank[Merge Keyword + Semantic Results]
+    Rerank --> Answering
+
+    Answering --> OpenAI[OpenAI Chat Model]
+    Answering --> Fallback[Extractive Fallback]
+    OpenAI --> Response[Answer with Citations]
+    Fallback --> Response
+    Response --> Frontend
+```
+
+## Document Indexing Flow
+
+```mermaid
+sequenceDiagram
+    actor Admin as Admin / Uploader
+    participant UI as Vue Frontend
+    participant API as FastAPI API
+    participant Parser as Document Parser
+    participant Chunker as Chunking Service
+    participant DB as SQLite
+    participant Embed as Embedding Provider
+    participant Vector as Chroma
+
+    Admin->>UI: Upload document with title, department, and roles
+    UI->>API: POST /api/documents/upload
+    API->>Parser: Extract text and page metadata
+    Parser-->>API: Parsed pages
+    API->>Chunker: Split pages into searchable chunks
+    Chunker-->>API: Chunk ids, content, pages, token counts
+    API->>DB: Save document metadata and chunk records
+    API->>Embed: Create embeddings for chunk content
+    alt OPENAI_API_KEY configured
+        Embed-->>API: OpenAI embedding vectors
+    else No key or provider failure
+        Embed-->>API: Deterministic local hash vectors
+    end
+    API->>Vector: Upsert chunk vectors and metadata
+    API-->>UI: Indexed document summary
+```
+
+## Question Answering Flow
+
+```mermaid
+sequenceDiagram
+    actor User as Employee / Demo User
+    participant UI as Vue Frontend
+    participant API as FastAPI API
+    participant Access as Role Access Filter
+    participant DB as SQLite
+    participant Vector as Chroma
+    participant LLM as OpenAI Chat Model
+
+    User->>UI: Ask a question
+    UI->>API: POST /api/chat
+    API->>Access: Resolve user's allowed document roles
+    Access->>DB: Load active documents and permissions
+    DB-->>Access: Allowed document ids
+    API->>DB: Run keyword search over allowed chunks
+    API->>Vector: Run semantic search over allowed vectors
+    API->>API: Merge and rank keyword + semantic matches
+    alt Evidence is strong enough
+        alt LLM is configured and available
+            API->>LLM: Generate answer from top cited chunks
+            LLM-->>API: Grounded answer
+        else LLM unavailable
+            API->>API: Build extractive fallback answer from best matching sentence
+        end
+        API-->>UI: Answer, citations, retrieved chunks, latency
+    else Evidence is insufficient
+        API-->>UI: Insufficient-evidence response
+    end
+    API->>DB: Store query log with citations and latency
+```
+
 ## Demo Users
 
 | User ID | Department | Roles |
