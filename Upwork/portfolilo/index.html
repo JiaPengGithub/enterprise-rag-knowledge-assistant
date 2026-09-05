@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Enterprise Knowledge Assistant — Portfolio Cover</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 100%; min-height: 100%; }
+    body { background: #eef1f4; font-family: Arial, Helvetica, sans-serif; }
+    .frame { position: relative; margin: 0 auto; overflow: hidden; }
+    .cover {
+      position: absolute; left: 0; top: 0; width: 1000px; height: 750px;
+      transform-origin: top left; overflow: hidden;
+      background: linear-gradient(130deg, #fff 0%, #fff 68%, #fbfcfc 100%);
+      color: #080f20; padding: 32px 40px 16px;
+    }
+    h1 { margin: 0; font-size: 40px; line-height: 48px; letter-spacing: -1.2px; font-weight: 700; white-space: nowrap; }
+    .subtitle { margin: 8px 0 18px; font-size: 20px; line-height: 24px; letter-spacing: -.35px; color: #233044; }
+    .screenshot {
+      display: block; width: 920px; height: auto; border: 1px solid #d8e1e7;
+      border-radius: 12px; box-shadow: 0 4px 14px #102e4110;
+    }
+    footer { display: flex; align-items: center; justify-content: space-between; margin-top: 18px; gap: 24px; min-height: 44px; }
+    .tags { display: flex; align-items: center; gap: 10px; }
+    .tag { display: flex; align-items: center; gap: 8px; padding: 11px 13px; border-radius: 12px; color: #005d50; background: #eaf6f2; font-size: 14px; white-space: nowrap; }
+    .tag svg { flex-shrink: 0; width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+    .demo { flex-shrink: 0; display: flex; flex-direction: column; justify-content: center; gap: 5px; min-height: 40px; padding-left: 20px; border-left: 1px solid #d8e1e7; text-align: right; white-space: nowrap; }
+    .demo-title { color: #344558; font-size: 14px; line-height: 17px; font-weight: 600; }
+    .demo-detail { color: #718092; font-size: 11px; line-height: 14px; }
+    @media print { body { background: white; } }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <main class="cover" aria-label="Enterprise Knowledge Assistant portfolio cover">
+      <h1>Enterprise Knowledge Assistant</h1>
+      <p class="subtitle">Document Q&amp;A with Source Citations</p>
+      <img class="screenshot" src="demo-screenshot.png" width="2646" height="1532" alt="Application answering a vacation policy question with an Employee Handbook source citation">
+      <footer>
+        <div class="tags">
+          <div class="tag"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H5a1 1 0 0 0-1 1v18a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V8z"/><path d="M14 2v6h6M8 12h8M8 16h8M8 19h5"/></svg>Source Citations</div>
+          <div class="tag"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 3 6v6c0 5 9 10 9 10s9-5 9-10V6z"/><path d="m8 12 3 3 5-6"/></svg>Access Filtering</div>
+          <div class="tag"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h6l3 3h9v14H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/></svg>Document Management</div>
+        </div>
+        <div class="demo">
+          <span class="demo-title">Independent Demo</span>
+          <span class="demo-detail">Enterprise Project Experience</span>
+        </div>
+      </footer>
+    </main>
+  </div>
+  <script>
+    // Keep the complete 4:3 cover visible at any window size and browser zoom.
+    function fitCover() {
+      const scale = Math.min(window.innerWidth / 1000, window.innerHeight / 750);
+      const frame = document.querySelector('.frame');
+      frame.style.width = `${1000 * scale}px`;
+      frame.style.height = `${750 * scale}px`;
+      document.querySelector('.cover').style.transform = `scale(${scale})`;
+    }
+    window.addEventListener('resize', fitCover);
+    fitCover();
+  </script>
+</body>
+</html>
