@@ -7,6 +7,7 @@ from fastapi import UploadFile
 from app.core.config import get_settings
 from app.services.chunking import chunk_pages
 from app.services.parsing import parse_document
+from app.services.retrieval import can_access_document
 from app.services.vector_store import ChromaIndex
 from app.storage.database import dumps, get_connection, loads, row_to_dict, rows_to_dicts
 
@@ -15,7 +16,7 @@ VALID_CLASSIFICATIONS = {"public", "internal", "confidential"}
 DEFAULT_CLASSIFICATION = "internal"
 
 
-def list_documents() -> list[dict]:
+def list_documents(user: dict | None = None) -> list[dict]:
     with get_connection() as connection:
         rows = rows_to_dicts(
             connection.execute(
@@ -31,6 +32,8 @@ def list_documents() -> list[dict]:
         )
     for row in rows:
         row["roles"] = loads(row["roles"], [])
+    if user and "admin" not in set(user["roles"]):
+        rows = [row for row in rows if can_access_document(user, row)]
     return rows
 
 
@@ -161,14 +164,15 @@ def get_document(document_id: str) -> dict | None:
 
 def seed_sample_documents() -> None:
     settings = get_settings()
-    existing = list_documents()
-    if existing:
-        return
     samples = [
         ("employee_handbook.md", "Employee Handbook", "Human Resources", ["hr"], "confidential"),
         ("it_operations_manual.md", "IT Operations Manual", "IT", ["it"], "confidential"),
         ("project_orion_brief.md", "Project Orion Brief", "Product", ["project"], "confidential"),
     ]
+    existing = list_documents()
+    if existing:
+        _repair_sample_document_metadata(samples)
+        return
     for filename, title, department, roles, classification in samples:
         path = settings.sample_docs_dir / filename
         if path.exists():
@@ -180,3 +184,16 @@ def normalize_classification(classification: str | None) -> str:
     if normalized not in VALID_CLASSIFICATIONS:
         raise ValueError("classification must be one of: public, internal, confidential")
     return normalized
+
+
+def _repair_sample_document_metadata(samples: list[tuple[str, str, str, list[str], str]]) -> None:
+    with get_connection() as connection:
+        for filename, title, department, roles, classification in samples:
+            connection.execute(
+                """
+                UPDATE documents
+                SET title = ?, department = ?, roles = ?, classification = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE source_filename = ?
+                """,
+                (title, department, dumps(roles), classification, filename),
+            )

@@ -4,7 +4,7 @@ from uuid import uuid4
 from app.core.config import get_settings
 from app.services.retrieval import hybrid_search
 from app.services.users import get_user
-from app.services.vector_store import overlap_score, tokenize
+from app.services.vector_store import AI_RUNTIME_STATUS, overlap_score, tokenize
 from app.storage.database import dumps, get_connection, loads, rows_to_dicts
 
 
@@ -38,12 +38,20 @@ def answer_question(question: str, user_id: str) -> dict:
     return payload
 
 
-def list_logs(limit: int = 50) -> list[dict]:
+def list_logs(user_id: str, limit: int = 50) -> list[dict]:
+    user = get_user(user_id)
+    if not user:
+        raise ValueError("Unknown demo user.")
+    params: tuple = (limit,)
+    where_clause = ""
+    if "admin" not in set(user["roles"]):
+        where_clause = "WHERE user_id = ?"
+        params = (user_id, limit)
     with get_connection() as connection:
         rows = rows_to_dicts(
             connection.execute(
-                "SELECT * FROM query_logs ORDER BY created_at DESC LIMIT ?",
-                (limit,),
+                f"SELECT * FROM query_logs {where_clause} ORDER BY created_at DESC LIMIT ?",
+                params,
             ).fetchall()
         )
     for row in rows:
@@ -63,6 +71,7 @@ def _generate_answer(question: str, chunks: list[dict], citations: list[dict]) -
 
 def _try_model_answer(question: str, chunks: list[dict]) -> str | None:
     settings = get_settings()
+    AI_RUNTIME_STATUS["chat_configured"] = bool(settings.openai_api_key)
     if not settings.openai_api_key:
         return None
     try:
@@ -84,13 +93,15 @@ def _try_model_answer(question: str, chunks: list[dict]) -> str | None:
             ],
             temperature=0.1,
         )
+        AI_RUNTIME_STATUS.update({"chat_verified": True, "chat_mode": "openai", "chat_last_error": None})
         return response.choices[0].message.content
-    except Exception:
+    except Exception as exc:
+        AI_RUNTIME_STATUS.update({"chat_verified": False, "chat_mode": "local_fallback", "chat_last_error": str(exc)})
         return None
 
 
 def _best_sentence(question: str, content: str) -> str:
-    query_tokens = tokenize(question)
+    query_tokens = tokenize(question, expand=True)
     sentences = [sentence.strip() for sentence in content.replace("\n", " ").split(".") if sentence.strip()]
     if not sentences:
         return content[:400]
@@ -99,7 +110,7 @@ def _best_sentence(question: str, content: str) -> str:
 
 
 def _evidence_score(question: str, chunks: list[dict]) -> float:
-    query_tokens = tokenize(question)
+    query_tokens = tokenize(question, expand=True)
     if not chunks:
         return 0.0
     return max(overlap_score(query_tokens, chunk["content"]) for chunk in chunks)

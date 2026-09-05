@@ -38,6 +38,10 @@ button:disabled {
   opacity: 0.55;
 }
 
+.danger-button {
+  background: #b42318;
+}
+
 .app-shell {
   display: grid;
   grid-template-columns: 300px 1fr;
@@ -69,10 +73,35 @@ button:disabled {
 .brand p,
 .panel p,
 .field span,
+.helper-text,
 .document-card small,
 .source-card span,
 .logs span {
   color: #667085;
+}
+
+.helper-text {
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.mode-card {
+  background: #f8fafc;
+  border: 1px solid #d9e1e7;
+  border-radius: 8px;
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+}
+
+.mode-card strong {
+  color: #176b5c;
+}
+
+.mode-card span {
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .nav-tabs {

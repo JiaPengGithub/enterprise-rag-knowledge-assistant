@@ -10,13 +10,19 @@
       </div>
 
       <label class="field">
-        <span>Demo user</span>
+        <span>Demo user selector</span>
         <select v-model="selectedUserId">
           <option v-for="user in users" :key="user.id" :value="user.id">
             {{ user.display_name }}
           </option>
         </select>
+        <small class="helper-text">Simulated identity for portfolio access-control checks, not real authentication.</small>
       </label>
+
+      <div class="mode-card">
+        <strong>{{ aiModeLabel }}</strong>
+        <span>{{ aiStatusText }}</span>
+      </div>
 
       <nav class="nav-tabs">
         <button :class="{ active: tab === 'chat' }" @click="tab = 'chat'">
@@ -70,7 +76,7 @@
         <header class="panel-header">
           <div>
             <h2>Document management</h2>
-            <p>Upload source material and assign access controls for permission-aware retrieval.</p>
+            <p>Upload source material and assign access controls as the selected simulated user.</p>
           </div>
         </header>
 
@@ -100,8 +106,9 @@
             <span>{{ uploadForm.file?.name || 'Choose PDF, DOCX, TXT, or Markdown' }}</span>
             <input type="file" accept=".pdf,.docx,.txt,.md,.markdown" @change="selectFile" />
           </label>
-          <button :disabled="!uploadForm.file"><FilePlusIcon :size="18" /> Upload</button>
+          <button :disabled="!uploadForm.file || !isAdmin"><FilePlusIcon :size="18" /> Upload</button>
         </form>
+        <p v-if="!isAdmin" class="empty">Document upload, update, and delete require the Knowledge Admin demo user.</p>
 
         <div class="document-grid">
           <article v-for="document in documents" :key="document.id" class="document-card">
@@ -110,6 +117,7 @@
             <span>{{ document.roles.join(', ') }}</span>
             <span class="classification">{{ document.classification }}</span>
             <small>Version {{ document.version }} · {{ document.chunk_count }} chunks</small>
+            <button class="danger-button" :disabled="!isAdmin" @click="removeDocument(document.id)">Delete</button>
           </article>
         </div>
       </section>
@@ -145,7 +153,16 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import {
+  ActivityIcon,
+  BookOpenIcon,
+  FilePlusIcon,
+  MessageSquareIcon,
+  PlayIcon,
+  ShieldCheckIcon,
+  UploadIcon,
+} from '@lucide/vue'
 import { api } from './api'
 
 const tab = ref('chat')
@@ -158,6 +175,7 @@ const answer = ref(null)
 const error = ref('')
 const loading = ref(false)
 const evaluationSummary = ref(null)
+const aiStatus = ref(null)
 
 const uploadForm = reactive({
   title: '',
@@ -168,14 +186,32 @@ const uploadForm = reactive({
 })
 
 const selectedUser = computed(() => users.value.find((user) => user.id === selectedUserId.value))
+const isAdmin = computed(() => selectedUser.value?.roles?.includes('admin'))
+const aiModeLabel = computed(() => {
+  if (!aiStatus.value?.embedding_configured && !aiStatus.value?.chat_configured) return 'Local fallback mode'
+  if (aiStatus.value?.embedding_verified || aiStatus.value?.chat_verified) return 'OpenAI verified'
+  return 'OpenAI configured, not verified'
+})
+const aiStatusText = computed(() => {
+  if (!aiStatus.value) return 'Checking runtime mode...'
+  if (!aiStatus.value.embedding_configured && !aiStatus.value.chat_configured) {
+    return 'No API key configured; using local hash embeddings and extractive answers.'
+  }
+  return `Embeddings: ${aiStatus.value.embedding_mode}; chat: ${aiStatus.value.chat_mode}.`
+})
 
 async function loadAll() {
   users.value = await api.users()
-  documents.value = await api.documents()
-  logs.value = await api.logs()
+  aiStatus.value = await api.aiStatus()
+  await refreshUserScopedData()
   if (selectedUser.value === undefined && users.value.length) {
     selectedUserId.value = users.value[0].id
   }
+}
+
+async function refreshUserScopedData() {
+  documents.value = await api.documents(selectedUserId.value)
+  logs.value = await api.logs(selectedUserId.value)
 }
 
 async function ask() {
@@ -183,7 +219,8 @@ async function ask() {
   loading.value = true
   try {
     answer.value = await api.chat({ question: question.value, user_id: selectedUserId.value })
-    logs.value = await api.logs()
+    aiStatus.value = await api.aiStatus()
+    logs.value = await api.logs(selectedUserId.value)
   } catch (err) {
     error.value = err.message
   } finally {
@@ -201,13 +238,24 @@ function selectFile(event) {
 async function upload() {
   error.value = ''
   try {
-    await api.uploadDocument(uploadForm)
+    await api.uploadDocument(uploadForm, selectedUserId.value)
     uploadForm.title = ''
     uploadForm.department = 'General'
     uploadForm.roles = 'employee'
     uploadForm.classification = 'internal'
     uploadForm.file = null
-    documents.value = await api.documents()
+    aiStatus.value = await api.aiStatus()
+    documents.value = await api.documents(selectedUserId.value)
+  } catch (err) {
+    error.value = err.message
+  }
+}
+
+async function removeDocument(documentId) {
+  error.value = ''
+  try {
+    await api.deleteDocument(documentId, selectedUserId.value)
+    documents.value = await api.documents(selectedUserId.value)
   } catch (err) {
     error.value = err.message
   }
@@ -217,11 +265,17 @@ async function runEvaluation() {
   error.value = ''
   try {
     evaluationSummary.value = await api.runEvaluation()
-    logs.value = await api.logs()
+    logs.value = await api.logs(selectedUserId.value)
   } catch (err) {
     error.value = err.message
   }
 }
+
+watch(selectedUserId, () => {
+  refreshUserScopedData().catch((err) => {
+    error.value = err.message
+  })
+})
 
 onMounted(loadAll)
 </script>

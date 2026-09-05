@@ -189,13 +189,14 @@ npm run dev
 
 | Method | Path | Purpose |
 | --- | --- | --- |
+| `GET` | `/api/ai/status` | Show whether OpenAI calls are configured and verified or the app is using local fallback mode |
 | `GET` | `/api/users/demo` | List demo users |
-| `GET` | `/api/documents` | List active documents |
-| `POST` | `/api/documents/upload` | Upload and index a document |
-| `PATCH` | `/api/documents/{document_id}` | Update document metadata and reindex a new version |
-| `DELETE` | `/api/documents/{document_id}` | Deactivate a document |
+| `GET` | `/api/documents?user_id=...` | List active documents visible to the selected demo user |
+| `POST` | `/api/documents/upload` | Upload and index a document; requires `user_id=admin` in the form body |
+| `PATCH` | `/api/documents/{document_id}` | Update document metadata and reindex a new version; requires `user_id=admin` in the JSON body |
+| `DELETE` | `/api/documents/{document_id}?user_id=admin` | Deactivate a document as the admin demo user |
 | `POST` | `/api/chat` | Ask a question as a demo user |
-| `GET` | `/api/chat/logs` | List recent query logs |
+| `GET` | `/api/chat/logs?user_id=...` | List recent query logs for the selected demo user; admin can see all logs |
 | `GET` | `/api/evaluations` | List evaluation records |
 | `POST` | `/api/evaluations/run` | Run seeded retrieval evaluation cases |
 
@@ -211,6 +212,7 @@ The final question should return the insufficient-evidence response unless suppo
 ## Configuration
 
 The demo runs without an API key by using deterministic local hash embeddings for retrieval and extractive answers. This fallback is useful for local demos, but it should be described as a fallback in portfolio or Upwork materials.
+The frontend displays the current runtime mode. It shows local fallback when no key is configured, OpenAI configured but not verified before a successful live call, and OpenAI verified only after an embedding or chat request succeeds.
 
 To use OpenAI for both chat answers and semantic embeddings, configure:
 
@@ -226,4 +228,4 @@ When `OPENAI_API_KEY` is set, document indexing and semantic search use `EMBEDDI
 
 ## Notes
 
-This is a personal demo, not a production security system. Authentication is simulated through selectable demo users, and page extraction depends on the source file format and parser support.
+This is a personal demo, not a production security system. Authentication is simulated through selectable demo users, and the selector is explicitly labeled as simulated identity rather than real authentication. Page extraction depends on the source file format and parser support.

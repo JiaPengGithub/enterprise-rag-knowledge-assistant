@@ -61,7 +61,7 @@ def hybrid_search(question: str, user: dict, limit: int | None = None) -> list[d
 
 
 def _keyword_search(question: str, allowed_ids: list[str], limit: int) -> list[dict]:
-    query_tokens = tokenize(question)
+    query_tokens = tokenize(question, expand=True)
     if not query_tokens:
         return []
     rows = _load_chunks(allowed_ids)
@@ -94,7 +94,7 @@ def _keyword_search(question: str, allowed_ids: list[str], limit: int) -> list[d
 
 
 def _semantic_fallback(question: str, allowed_ids: list[str], limit: int) -> list[dict]:
-    query_tokens = tokenize(question)
+    query_tokens = tokenize(question, expand=True)
     scores = []
     for row in _load_chunks(allowed_ids):
         score = overlap_score(query_tokens, row["content"])

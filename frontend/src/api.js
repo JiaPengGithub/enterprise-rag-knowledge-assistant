@@ -11,8 +11,9 @@ async function request(path, options = {}) {
 
 export const api = {
   users: () => request('/api/users/demo'),
-  documents: () => request('/api/documents'),
-  logs: () => request('/api/chat/logs'),
+  aiStatus: () => request('/api/ai/status'),
+  documents: (userId) => request(`/api/documents?user_id=${encodeURIComponent(userId)}`),
+  logs: (userId) => request(`/api/chat/logs?user_id=${encodeURIComponent(userId)}`),
   evaluations: () => request('/api/evaluations'),
   runEvaluation: () => request('/api/evaluations/run', { method: 'POST' }),
   chat: (payload) =>
@@ -21,13 +22,14 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     }),
-  uploadDocument: (payload) => {
+  uploadDocument: (payload, userId) => {
     const form = new FormData()
     form.append('file', payload.file)
     form.append('title', payload.title)
     form.append('department', payload.department)
     form.append('roles', payload.roles)
     form.append('classification', payload.classification)
+    form.append('user_id', userId)
     return request('/api/documents/upload', { method: 'POST', body: form })
   },
   updateDocument: (documentId, payload) =>
@@ -35,5 +37,9 @@ export const api = {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
+    }),
+  deleteDocument: (documentId, userId) =>
+    request(`/api/documents/${documentId}?user_id=${encodeURIComponent(userId)}`, {
+      method: 'DELETE',
     }),
 }

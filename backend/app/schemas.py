@@ -12,6 +12,7 @@ class ChatRequest(BaseModel):
 
 
 class DocumentUpdate(BaseModel):
+    user_id: str = "admin"
     title: str | None = None
     department: str | None = None
     roles: list[str] | None = None
