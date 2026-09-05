@@ -132,9 +132,9 @@
         </header>
 
         <div v-if="evaluationSummary" class="metric-row">
-          <div><strong>{{ evaluationSummary.hit_rate }}</strong><span>Hit rate</span></div>
-          <div><strong>{{ evaluationSummary.mrr }}</strong><span>MRR</span></div>
-          <div><strong>{{ evaluationSummary.citation_coverage }}</strong><span>Citation coverage</span></div>
+          <div><strong>{{ formatPercent(evaluationSummary.hit_rate) }}</strong><span>Hit rate</span></div>
+          <div><strong>{{ formatPercent(evaluationSummary.mrr) }}</strong><span>MRR</span></div>
+          <div><strong>{{ formatPercent(evaluationSummary.citation_coverage) }}</strong><span>Citation coverage</span></div>
         </div>
 
         <div class="logs">
@@ -233,6 +233,10 @@ function selectFile(event) {
   if (!uploadForm.title && uploadForm.file) {
     uploadForm.title = uploadForm.file.name.replace(/\.[^.]+$/, '')
   }
+}
+
+function formatPercent(value) {
+  return `${Math.round(Number(value || 0) * 100)}%`
 }
 
 async function upload() {
